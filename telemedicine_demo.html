@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智慧遠距醫療診療與健康管理系統 DEMO</title>
+<style>
+:root{--bg:#f3f6f5;--card:#fff;--ink:#14302b;--mute:#5b736e;--line:#d5e1de;--pri:#0f766e;--pri-ink:#fff;--soft:#e2f1ee;--warn:#b45309;--bad:#b91c1c;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1a18;--card:#162623;--ink:#e5f0ed;--mute:#92aaa4;--line:#29403b;--pri:#2dd4bf;--pri-ink:#04201c;--soft:#1c3430;--warn:#fbbf24;--bad:#f87171;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px;background:var(--pri);color:var(--pri-ink);flex-wrap:wrap}
+header b{font-size:17px}
+header button{background:transparent;color:inherit;border:1px solid currentColor}
+nav{display:flex;gap:4px;padding:8px 20px 0;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+nav button{background:none;color:var(--mute);border:0;border-bottom:3px solid transparent;border-radius:0;padding:10px 14px}
+nav button.on{color:var(--pri);border-color:var(--pri);font-weight:700}
+main{max-width:980px;margin:0 auto;padding:20px}
+h2{margin:0 0 14px;font-size:20px}
+h3{margin:0 0 8px;font-size:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.mute{color:var(--mute)}
+input,select,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-width:0}
+textarea{width:100%;resize:vertical}
+button{font:inherit;cursor:pointer;background:var(--pri);color:var(--pri-ink);border:0;border-radius:6px;padding:7px 14px}
+button.ghost{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+button.bad{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.slot{background:var(--soft);color:var(--ink);border:1px solid var(--line);margin:0 6px 6px 0}
+.slot small{display:block;color:var(--pri);font-size:12px}
+.slot.full{opacity:.55}.slot.full small{color:var(--bad)}
+.tag{display:inline-block;padding:1px 9px;border-radius:99px;background:var(--soft);font-size:13px}
+.tag.x{color:var(--bad)}.tag.ok{color:var(--pri)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.video{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.pane{height:120px;border-radius:8px;background:#1f3a36;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.pane i{font-style:normal;font-size:34px;width:56px;height:56px;border-radius:50%;background:#2f5a53;display:flex;align-items:center;justify-content:center}
+.pane small{margin-top:4px;opacity:.85}
+.chat{height:150px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;margin-bottom:8px}
+.chat p{margin:0 0 4px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.show{opacity:1}
+.login{max-width:380px;margin:8vh auto;padding:0 16px}
+.login input{width:100%;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status"></div>
+<script>
+/* ========== 資料層 ========== */
+const KEY='telemed_demo_v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const dstr=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const now=()=>new Date().toLocaleString('zh-TW',{hour12:false});
+
+function seed(){
+  const users=[
+    {id:'p1',name:'王小明',acc:'patient',pw:'1234',role:'patient',on:1,birth:'1990-05-12',phone:'0912-345-678'},
+    {id:'p2',name:'李小華',acc:'patient2',pw:'1234',role:'patient',on:1,birth:'1985-03-02',phone:'0922-111-222'},
+    {id:'d1',name:'林大明 醫師',acc:'doctor',pw:'1234',role:'doctor',on:1,dept:'內科',spec:'高血壓、糖尿病'},
+    {id:'d2',name:'陳美玲 醫師',acc:'doctor2',pw:'1234',role:'doctor',on:1,dept:'皮膚科',spec:'濕疹、過敏'},
+    {id:'a1',name:'系統管理員',acc:'admin',pw:'1234',role:'admin',on:1}
+  ];
+  const slots=[];
+  ['d1','d2'].forEach(d=>[1,2].forEach(n=>['09:00','10:00','14:00'].forEach(t=>slots.push({id:uid(),doc:d,date:dstr(n),time:t,cap:2}))));
+  slots[0].cap=1; /* 讓第一個時段示範「額滿」 */
+  const appts=[{id:uid(),pat:'p2',slot:slots[0].id,complaint:'血壓偏高',status:'已預約',chat:[]}];
+  const records=[{id:uid(),pat:'p1',doc:'d1',date:dstr(-30),complaint:'頭暈',diagnosis:'輕度高血壓',treatment:'調整飲食、每日量血壓',rx:[{drug:'Amlodipine',dose:'5mg',usage:'每日一次',days:30}],referral:''}];
+  return {users,depts:['內科','皮膚科','家醫科','小兒科'],slots,appts,records,health:[],audit:[]};
+}
+function load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
+let db=load()||seed();
+const S={me:null,view:'',arg:null,kw:'',dp:'',reg:false};
+const user=id=>db.users.find(u=>u.id===id)||{name:'(已移除)'};
+const slotOf=id=>db.slots.find(s=>s.id===id);
+const left=s=>s.cap-db.appts.filter(a=>a.slot===s.id&&a.status!=='已取消').length;
+const log=t=>{db.audit.unshift({time:now(),who:S.me.name,act:t});save()};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2600)}
+function go(v,a){S.view=v;S.arg=a;render()}
+
+/* ========== 登入 / 註冊 ========== */
+function vLogin(){return `<div class="login"><h2>智慧遠距醫療診療與健康管理系統</h2>
+<div class="card"><h3>${S.reg?'註冊病患帳號':'登入'}</h3>
+${S.reg?'<input id="rn" placeholder="姓名">':''}
+<input id="ac" placeholder="帳號" autocomplete="username"><input id="pw" type="password" placeholder="密碼" autocomplete="current-password">
+<div class="row"><button onclick="${S.reg?'doReg()':'doLogin()'}">${S.reg?'註冊':'登入'}</button>
+<button class="ghost" onclick="S.reg=!S.reg;render()">${S.reg?'回到登入':'我要註冊'}</button></div></div>
+<p class="mute">示範帳號(密碼皆為 1234):<br>病患 patient、醫師 doctor、管理員 admin</p></div>`}
+function doLogin(){
+  const u=db.users.find(x=>x.acc===$('#ac').value.trim()&&x.pw===$('#pw').value);
+  if(!u)return toast('帳號或密碼錯誤,請重新輸入');
+  if(!u.on)return toast('此帳號已停用,請聯絡管理員');
+  S.me=u;S.view={patient:'search',doctor:'appts',admin:'accounts'}[u.role];render();
+}
+function doReg(){
+  const n=$('#rn').value.trim(),a=$('#ac').value.trim(),p=$('#pw').value;
+  if(!n||!a||p.length<4)return toast('請填姓名、帳號,密碼至少 4 碼');
+  if(db.users.some(u=>u.acc===a))return toast('此帳號已被使用');
+  db.users.push({id:uid(),name:n,acc:a,pw:p,role:'patient',on:1,birth:'',phone:''});save();
+  S.reg=false;toast('註冊成功,請登入');render();
+}
+
+/* ========== 病患 ========== */
+function vSearch(){
+  const docs=db.users.filter(u=>u.role==='doctor'&&u.on&&(!S.dp||u.dept===S.dp)&&(!S.kw||(u.name+u.dept+u.spec).includes(S.kw)));
+  return `<h2>查詢醫師與預約</h2><div class="row"><input id="kw" placeholder="醫師姓名、科別或專長" value="${esc(S.kw)}">
+<select id="dp"><option value="">全部科別</option>${db.depts.map(d=>`<option ${d===S.dp?'selected':''}>${esc(d)}</option>`).join('')}</select>
+<button onclick="S.kw=$('#kw').value;S.dp=$('#dp').value;render()">查詢</button></div>`+
+  (docs.length?docs.map(d=>{
+    const ss=db.slots.filter(s=>s.doc===d.id).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    return `<div class="card"><h3>${esc(d.name)} <span class="tag">${esc(d.dept)}</span></h3><p class="mute">專長:${esc(d.spec)}</p>
+${ss.length?ss.map(s=>`<button class="slot ${left(s)<=0?'full':''}" onclick="book('${s.id}')">${s.date.slice(5)} ${s.time}<small>${left(s)>0?'剩 '+left(s)+' 名':'額滿'}</small></button>`).join(''):'<p class="mute">尚無開放時段</p>'}</div>`}).join('')
+  :'<p class="mute">查無符合的醫師,請換個關鍵字或科別。</p>');
+}
+function book(id){
+  const s=slotOf(id);
+  if(left(s)<=0)return toast('此時段已額滿,請重新選擇其他時段');
+  if(db.appts.some(a=>a.pat===S.me.id&&a.slot===id&&a.status!=='已取消'))return toast('您已預約過此時段');
+  const c=prompt('請簡述主訴或症狀(可留空)','');if(c===null)return;
+  db.appts.push({id:uid(),pat:S.me.id,slot:id,complaint:c,status:'已預約',chat:[]});save();
+  toast('預約成功,已通知醫師與病患');go('appts');
+}
+function vPAppts(){
+  const list=db.appts.filter(a=>a.pat===S.me.id).sort((a,b)=>slotOf(b.slot).date.localeCompare(slotOf(a.slot).date));
+  return `<h2>我的預約</h2>`+(list.length?list.map(a=>{const s=slotOf(a.slot);return `<div class="card"><div class="row"><b>${s.date} ${s.time}</b><span>${esc(user(s.doc).name)}</span><span class="tag ${a.status==='已取消'?'x':'ok'}">${a.status}</span></div>
+<p class="mute">主訴:${esc(a.complaint)||'(未填)'}</p>
+${a.status==='已預約'?`<button onclick="enter('${a.id}')">進入視訊問診</button> <button class="bad" onclick="cancelA('${a.id}')">取消預約</button>`:''}</div>`}).join(''):'<p class="mute">目前沒有預約,到「查詢與預約」挑選時段。</p>');
+}
+function cancelA(id){if(!confirm('確定要取消這筆預約?'))return;db.appts.find(a=>a.id===id).status='已取消';save();toast('預約已取消,時段已釋出,並通知醫師');render()}
+function vRecords(){
+  const rs=db.records.filter(r=>r.pat===S.me.id).sort((a,b)=>b.date.localeCompare(a.date));
+  return `<h2>電子病歷與處方</h2>`+(rs.length?rs.map(recCard).join(''):'<p class="mute">目前沒有病歷。完成問診後,醫師建立的病歷會顯示在這裡。</p>');
+}
+function recCard(r){return `<div class="card"><div class="row"><b>${r.date}</b><span>${esc(user(r.doc).name)}</span></div>
+<p>主訴:${esc(r.complaint)}<br>診斷:${esc(r.diagnosis)}<br>治療:${esc(r.treatment)}</p>
+${r.rx.length?`<table><tr><th>藥品</th><th>劑量</th><th>用法</th><th>天數</th></tr>${r.rx.map(x=>`<tr><td>${esc(x.drug)}</td><td>${esc(x.dose)}</td><td>${esc(x.usage)}</td><td>${esc(x.days)}</td></tr>`).join('')}</table>`:''}
+${r.referral?`<p><span class="tag x">轉診建議</span> ${esc(r.referral)}</p>`:''}</div>`}
+
+const HT={'收縮壓':'mmHg','血糖':'mg/dL','體重':'kg','心率':'bpm'};
+function spark(v){if(v.length<2)return '';const w=240,h=50,mx=Math.max(...v),mn=Math.min(...v),r=(mx-mn)||1;
+  const p=v.map((x,i)=>`${(i/(v.length-1)*w).toFixed(1)},${(h-4-(x-mn)/r*(h-8)).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="趨勢圖"><polyline points="${p}" fill="none" stroke="var(--pri)" stroke-width="2"/></svg>`}
+function vHealth(){
+  const mine=db.health.filter(h=>h.pat===S.me.id);
+  return `<h2>健康追蹤</h2><div class="card"><div class="row"><select id="ht">${Object.keys(HT).map(k=>`<option>${k}</option>`).join('')}</select>
+<input id="hv" type="number" step="any" placeholder="數值"><button onclick="addH()">記錄</button></div></div>
+<div class="grid">${Object.keys(HT).map(k=>{const v=mine.filter(h=>h.type===k);
+ return `<div class="card"><h3>${k} <span class="mute">${HT[k]}</span></h3>${v.length?`<p>最新:<b>${v[v.length-1].val}</b>(共 ${v.length} 筆)</p>${spark(v.map(x=>x.val))}`:'<p class="mute">尚無紀錄</p>'}</div>`}).join('')}</div>
+<h3>整合:最近處方</h3>${db.records.filter(r=>r.pat===S.me.id).flatMap(r=>r.rx.map(x=>`<p>${r.date} ${esc(x.drug)} ${esc(x.dose)},${esc(x.usage)},${esc(x.days)} 天</p>`)).join('')||'<p class="mute">無處方紀錄</p>'}`;
+}
+function addH(){const v=parseFloat($('#hv').value);if(isNaN(v))return toast('請輸入數值');
+  db.health.push({pat:S.me.id,date:dstr(0),type:$('#ht').value,val:v});save();toast('已記錄');render()}
+
+/* ========== 視訊問診(病患 / 醫師共用) ========== */
+function enter(id){S.view='consult';S.arg=id;if(S.me.role==='doctor')log('查看病患資料(預約 '+id+')');render()}
+function vConsult(){
+  const a=db.appts.find(x=>x.id===S.arg),s=slotOf(a.slot),p=user(a.pat),d=user(s.doc),isD=S.me.role==='doctor';
+  const hist=db.records.filter(r=>r.pat===p.id);
+  const left_=`<h3>視訊問診 <span class="tag ok">● 連線中</span></h3>
+<div class="video"><div class="pane"><i>${esc(p.name[0])}</i><small>${esc(p.name)}(病患)</small></div><div class="pane"><i>${esc(d.name[0])}</i><small>${esc(d.name)}</small></div></div>
+<div class="chat" id="chat">${a.chat.map(m=>`<p><b>${esc(m.who)}:</b>${esc(m.t)}</p>`).join('')||'<p class="mute">可在這裡傳送文字訊息</p>'}</div>
+<div class="row"><input id="msg" placeholder="輸入訊息" style="flex:1" onkeydown="if(event.key==='Enter')sendM()"><button onclick="sendM()">送出</button></div>
+<button class="ghost" onclick="go('appts')">離開問診室</button>`;
+  const right=isD?`<h3>病患資料</h3><p>${esc(p.name)}|生日 ${esc(p.birth)||'—'}|${esc(p.phone)||'—'}<br>本次主訴:${esc(a.complaint)||'(未填)'}</p>
+<h3>過往病歷</h3>${hist.length?hist.map(r=>`<p class="mute">${r.date} ${esc(r.diagnosis)}</p>`).join(''):'<p class="mute">無過往紀錄</p>'}
+<h3>建立電子病歷</h3>
+<textarea id="f1" rows="2" placeholder="主訴">${esc(a.complaint)}</textarea>
+<textarea id="f2" rows="2" placeholder="診斷結果"></textarea><textarea id="f3" rows="2" placeholder="治療內容"></textarea>
+<p><label><input type="checkbox" id="frx" onchange="$('#rx').hidden=!this.checked"> 需藥物治療,開立電子處方</label></p>
+<div id="rx" hidden class="row"><input id="r1" placeholder="藥品名稱" size="10"><input id="r2" placeholder="劑量" size="6"><input id="r3" placeholder="用法" size="8"><input id="r4" type="number" placeholder="天數" style="width:70px"></div>
+<p><label><input type="checkbox" id="fref" onchange="$('#rf').hidden=!this.checked"> 需要轉診</label></p>
+<input id="rf" hidden placeholder="轉診建議(醫院/科別)" style="width:100%;margin-bottom:8px">
+<button onclick="saveRec('${a.id}')">儲存病歷並結束問診</button>`
+  :`<h3>問診說明</h3><p class="mute">醫師會在問診後建立電子病歷與處方,完成後可到「病歷與處方」查看。</p>`;
+  return `<div class="grid"><div class="card">${left_}</div><div class="card">${right}</div></div>`;
+}
+function sendM(){const t=$('#msg').value.trim();if(!t)return;db.appts.find(a=>a.id===S.arg).chat.push({who:S.me.name,t});save();render();const c=$('#chat');c.scrollTop=c.scrollHeight}
+function saveRec(id){
+  const a=db.appts.find(x=>x.id===id),dx=$('#f2').value.trim();
+  if(!dx)return toast('請填寫診斷結果');
+  const rx=[];if($('#frx').checked){if(!$('#r1').value.trim())return toast('請填寫藥品名稱');rx.push({drug:$('#r1').value,dose:$('#r2').value,usage:$('#r3').value,days:$('#r4').value})}
+  db.records.push({id:uid(),pat:a.pat,doc:S.me.id,date:dstr(0),complaint:$('#f1').value,diagnosis:dx,treatment:$('#f3').value,rx,referral:$('#fref').checked?$('#rf').value:''});
+  a.status='已完成';save();log('建立電子病歷(病患 '+user(a.pat).name+')');toast('病歷已儲存,問診結束');go('appts');
+}
+
+/* ========== 醫師 ========== */
+function vDAppts(){
+  const list=db.appts.filter(a=>slotOf(a.slot).doc===S.me.id&&a.status!=='已取消').sort((a,b)=>(slotOf(a.slot).date+slotOf(a.slot).time).localeCompare(slotOf(b.slot).date+slotOf(b.slot).time));
+  return `<h2>預約清單</h2>`+(list.length?`<table><tr><th>時間</th><th>病患</th><th>主訴</th><th>狀態</th><th></th></tr>${list.map(a=>{const s=slotOf(a.slot);return `<tr><td>${s.date} ${s.time}</td><td>${esc(user(a.pat).name)}</td><td>${esc(a.complaint)||'—'}</td><td><span class="tag ${a.status==='已完成'?'ok':''}">${a.status}</span></td><td>${a.status==='已預約'?`<button onclick="enter('${a.id}')">開始問診</button>`:''}</td></tr>`}).join('')}</table>`:'<p class="mute">目前沒有預約。</p>');
+}
+
+/* ========== 管理員 ========== */
+function vAccounts(){return `<h2>帳號管理</h2><div class="card"><div class="row"><input id="an" placeholder="姓名"><input id="aa" placeholder="帳號"><input id="ap" placeholder="密碼" value="1234" size="8">
+<select id="ar"><option value="patient">病患</option><option value="doctor">醫師</option><option value="admin">管理員</option></select><select id="ad">${db.depts.map(d=>`<option>${esc(d)}</option>`).join('')}</select><button onclick="addU()">新增帳號</button></div><p class="mute">科別只在建立醫師帳號時使用。系統不提供刪除帳號,只能停用。</p></div>
+<table><tr><th>姓名</th><th>帳號</th><th>身分</th><th>狀態</th><th></th></tr>${db.users.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.acc)}</td><td>${{patient:'病患',doctor:'醫師',admin:'管理員'}[u.role]}</td><td><span class="tag ${u.on?'ok':'x'}">${u.on?'啟用':'停用'}</span></td><td>${u.id!==S.me.id?`<button class="ghost" onclick="togU('${u.id}')">${u.on?'停用':'啟用'}</button>`:''}</td></tr>`).join('')}</table>`}
+function addU(){const n=$('#an').value.trim(),a=$('#aa').value.trim(),r=$('#ar').value;
+  if(!n||!a)return toast('請填寫姓名與帳號');if(db.users.some(u=>u.acc===a))return toast('此帳號已存在');
+  db.users.push({id:uid(),name:r==='doctor'?n+' 醫師':n,acc:a,pw:$('#ap').value||'1234',role:r,on:1,dept:$('#ad').value,spec:'',birth:'',phone:''});save();toast('已新增帳號');render()}
+function togU(id){const u=user(id);u.on=u.on?0:1;save();toast(u.on?'帳號已啟用':'帳號已停用');render()}
+function vSlots(){const docs=db.users.filter(u=>u.role==='doctor');
+  return `<h2>醫師排班</h2><div class="card"><div class="row"><select id="sd">${docs.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><input id="sdt" type="date" value="${dstr(3)}"><input id="stm" type="time" value="09:00"><input id="scp" type="number" value="2" min="1" style="width:70px"><button onclick="addS()">新增時段</button></div></div>
+<table><tr><th>醫師</th><th>日期</th><th>時段</th><th>名額</th><th></th></tr>${[...db.slots].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).map(s=>`<tr><td>${esc(user(s.doc).name)}</td><td>${s.date}</td><td>${s.time}</td><td>${s.cap-left(s)} / ${s.cap}</td><td><button class="bad" onclick="delS('${s.id}')">刪除</button></td></tr>`).join('')}</table>`}
+function addS(){if(!$('#sdt').value||!$('#stm').value)return toast('請填寫日期與時間');db.slots.push({id:uid(),doc:$('#sd').value,date:$('#sdt').value,time:$('#stm').value,cap:+$('#scp').value||1});save();toast('已新增排班');render()}
+function delS(id){if(db.appts.some(a=>a.slot===id&&a.status==='已預約'))return toast('此時段已有預約,無法刪除');db.slots=db.slots.filter(s=>s.id!==id);save();render()}
+function vDepts(){return `<h2>科別資料</h2><div class="row"><input id="dn" placeholder="新科別名稱"><button onclick="addD()">新增科別</button></div>${db.depts.map(d=>`<div class="card row" style="justify-content:space-between"><b>${esc(d)}</b><button class="bad" onclick="delD('${esc(d)}')">刪除</button></div>`).join('')}`}
+function addD(){const n=$('#dn').value.trim();if(!n)return toast('請輸入科別名稱');if(db.depts.includes(n))return toast('科別已存在');db.depts.push(n);save();render()}
+function delD(n){if(db.users.some(u=>u.dept===n&&u.role==='doctor'))return toast('仍有醫師隸屬此科別,無法刪除');db.depts=db.depts.filter(d=>d!==n);save();render()}
+function vAudit(){return `<h2>存取紀錄</h2>`+(db.audit.length?`<table><tr><th>時間</th><th>使用者</th><th>動作</th></tr>${db.audit.map(a=>`<tr><td>${a.time}</td><td>${esc(a.who)}</td><td>${esc(a.act)}</td></tr>`).join('')}</table>`:'<p class="mute">尚無紀錄。醫師查看病患資料或建立病歷時,會自動記錄在這裡。</p>')}
+
+/* ========== 畫面 ========== */
+const NAV={patient:[['search','查詢與預約'],['appts','我的預約'],['records','病歷與處方'],['health','健康追蹤']],doctor:[['appts','預約清單']],admin:[['accounts','帳號管理'],['slots','醫師排班'],['depts','科別資料'],['audit','存取紀錄']]};
+const V={search:vSearch,records:vRecords,health:vHealth,consult:vConsult,accounts:vAccounts,slots:vSlots,depts:vDepts,audit:vAudit,appts:()=>S.me.role==='doctor'?vDAppts():vPAppts()};
+function render(){
+  const app=$('#app');
+  if(!S.me){app.innerHTML=vLogin();return}
+  const role={patient:'病患',doctor:'醫師',admin:'管理員'}[S.me.role];
+  app.innerHTML=`<header><b>智慧遠距醫療系統</b><span>${esc(S.me.name)}(${role}) <button onclick="S.me=null;render()">登出</button></span></header>
+<nav>${NAV[S.me.role].map(([k,t])=>`<button class="${S.view===k||(S.view==='consult'&&k==='appts')?'on':''}" onclick="go('${k}')">${t}</button>`).join('')}</nav><main>${V[S.view]()}</main>
+<main><button class="ghost" onclick="if(confirm('重設後會清除所有示範資料,確定嗎?')){db=seed();save();S.me=null;render()}">重設示範資料</button></main>`;
+}
+render();
+</script>
+</body>
+</html>
