@@ -46,6 +46,27 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
 #toast.show{opacity:1}
 .login{max-width:380px;margin:8vh auto;padding:0 16px}
 .login input{width:100%;margin-bottom:8px}
+/* 註冊身分選項 */
+.role-options {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.role-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.role-options input[type="radio"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--pri);
+}
 </style>
 </head>
 <body>
@@ -87,26 +108,78 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');cl
 function go(v,a){S.view=v;S.arg=a;render()}
 
 /* ========== 登入 / 註冊 ========== */
-function vLogin(){return `<div class="login"><h2>智慧遠距醫療診療與健康管理系統</h2>
-<div class="card"><h3>${S.reg?'註冊病患帳號':'登入'}</h3>
-${S.reg?'<input id="rn" placeholder="姓名">':''}
-<input id="ac" placeholder="帳號" autocomplete="username"><input id="pw" type="password" placeholder="密碼" autocomplete="current-password">
-<div class="row"><button onclick="${S.reg?'doReg()':'doLogin()'}">${S.reg?'註冊':'登入'}</button>
-<button class="ghost" onclick="S.reg=!S.reg;render()">${S.reg?'回到登入':'我要註冊'}</button></div></div>
-<p class="mute">示範帳號(密碼皆為 1234):<br>病患 patient、醫師 doctor、管理員 admin</p></div>`}
+
+function vLogin(){
+  return `<div class="login">
+  <h2>智慧遠距醫療診療與健康管理系統</h2>
+  <div class="card">
+    <h3>${S.reg?'註冊帳號':'登入'}</h3>
+
+    ${S.reg ? `
+      <p>請選擇註冊身分：</p>
+      <div class="role-options">
+        <label><input type="radio" name="role" value="patient" checked> 病患</label>
+        <label><input type="radio" name="role" value="doctor"> 醫師</label>
+        <label><input type="radio" name="role" value="admin"> 管理員</label>
+      </div>
+      <input id="rn" placeholder="姓名">
+    ` : ''}
+
+    <input id="ac" placeholder="帳號" autocomplete="username">
+    <input id="pw" type="password" placeholder="密碼">
+
+    <div class="row">
+      <button onclick="${S.reg?'doReg()':'doLogin()'}">
+        ${S.reg?'註冊':'登入'}
+      </button>
+      <button class="ghost" onclick="S.reg=!S.reg;render()">
+        ${S.reg?'回到登入':'我要註冊'}
+      </button>
+    </div>
+  </div>
+  <p class="mute">示範帳號(密碼皆為 1234):<br>
+  病患 patient、醫師 doctor、管理員 admin</p>
+  </div>`;
+}
+
 function doLogin(){
   const u=db.users.find(x=>x.acc===$('#ac').value.trim()&&x.pw===$('#pw').value);
   if(!u)return toast('帳號或密碼錯誤,請重新輸入');
   if(!u.on)return toast('此帳號已停用,請聯絡管理員');
   S.me=u;S.view={patient:'search',doctor:'appts',admin:'accounts'}[u.role];render();
 }
+
 function doReg(){
-  const n=$('#rn').value.trim(),a=$('#ac').value.trim(),p=$('#pw').value;
-  if(!n||!a||p.length<4)return toast('請填姓名、帳號,密碼至少 4 碼');
-  if(db.users.some(u=>u.acc===a))return toast('此帳號已被使用');
-  db.users.push({id:uid(),name:n,acc:a,pw:p,role:'patient',on:1,birth:'',phone:''});save();
-  S.reg=false;toast('註冊成功,請登入');render();
+  const n = $('#rn').value.trim();
+  const a = $('#ac').value.trim();
+  const p = $('#pw').value;
+  const role = document.querySelector('input[name="role"]:checked').value;
+
+  if(!n || !a || p.length < 4)
+    return toast('請填姓名、帳號，密碼至少 4 碼');
+
+  if(db.users.some(u => u.acc === a))
+    return toast('此帳號已被使用');
+
+  db.users.push({
+    id: uid(),
+    name: n,
+    acc: a,
+    pw: p,
+    role: role,
+    on: 1,
+    birth: '',
+    phone: '',
+    dept: '',
+    spec: ''
+  });
+
+  save();
+  S.reg = false;
+  toast('註冊成功，請登入');
+  render();
 }
+
 
 /* ========== 病患 ========== */
 function vSearch(){
